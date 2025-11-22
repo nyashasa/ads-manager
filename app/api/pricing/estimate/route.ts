@@ -51,8 +51,9 @@ export async function POST(request: Request) {
                   return NextResponse.json({ error: 'No routes or corridors specified' }, { status: 400 });
             }
 
-            // 3. Generate Estimate
-            const estimate = generateEstimate(flight, routesData, pricingModel);
+            // 3. Generate Estimate (exclude unavailable dates if provided)
+            const excludeDates = body.excludeDates || [];
+            const estimate = generateEstimate(flight, routesData, pricingModel, excludeDates);
 
             return NextResponse.json(estimate);
 

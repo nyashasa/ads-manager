@@ -1,18 +1,64 @@
-import { createClient } from '@supabase/supabase-js';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+'use client';
 
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PricingModelModal } from '@/components/admin/pricing-model-modal';
 
-export default async function AdminPricingPage() {
-      const { data: pricingModels } = await supabase.from('pricing_models').select('*');
+export default function AdminPricingPage() {
+      const [pricingModels, setPricingModels] = useState<any[]>([]);
+      const [loading, setLoading] = useState(true);
+      const [modalOpen, setModalOpen] = useState(false);
+
+      useEffect(() => {
+            fetchPricingModels();
+      }, []);
+
+      const fetchPricingModels = async () => {
+            try {
+                  const { data, error } = await supabase
+                        .from('pricing_models')
+                        .select('*')
+                        .order('name', { ascending: true });
+
+                  if (error) {
+                        console.error('Supabase error:', error);
+                        console.error('Error details:', {
+                              message: error.message,
+                              details: error.details,
+                              hint: error.hint,
+                              code: error.code
+                        });
+                        throw error;
+                  }
+                  setPricingModels(data || []);
+            } catch (error: any) {
+                  console.error('Error fetching pricing models:', error);
+                  console.error('Error type:', typeof error);
+                  console.error('Error stringified:', JSON.stringify(error, null, 2));
+                  // Set empty array on error so UI doesn't break
+                  setPricingModels([]);
+            } finally {
+                  setLoading(false);
+            }
+      };
+
+      if (loading) {
+            return (
+                  <div className="flex items-center justify-center min-h-[400px]">
+                        <p className="text-muted-foreground">Loading pricing models...</p>
+                  </div>
+            );
+      }
 
       return (
             <div className="space-y-6">
                   <div className="flex justify-between items-center">
                         <h2 className="text-2xl font-bold">Pricing Models</h2>
-                        <button className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm">
+                        <Button onClick={() => setModalOpen(true)}>
                               New Model
-                        </button>
+                        </Button>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -53,6 +99,12 @@ export default async function AdminPricingPage() {
                               </div>
                         )}
                   </div>
+
+                  <PricingModelModal
+                        open={modalOpen}
+                        onOpenChange={setModalOpen}
+                        onSuccess={fetchPricingModels}
+                  />
             </div>
       );
 }

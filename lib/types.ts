@@ -49,6 +49,7 @@ export interface RouteBreakdown {
 export interface PricingEstimateResponse {
       totalImpressions: number;
       estimatedReach: number;
+      avgFrequency?: number;
       cpm: number;
       estimatedCost: number;
       breakdown: RouteBreakdown[];

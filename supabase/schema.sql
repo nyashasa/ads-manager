@@ -126,6 +126,7 @@ CREATE TABLE campaigns (
     primary_segment TEXT,
     pricing_model_id UUID REFERENCES pricing_models(id),
     notes TEXT,
+    contact_info JSONB,
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -143,6 +144,7 @@ CREATE TABLE flights (
     corridors UUID[], -- Array of corridor IDs
     dayparts TEXT[],
     days_of_week INTEGER[],
+    share_of_voice NUMERIC CHECK (share_of_voice >= 0 AND share_of_voice <= 1), -- Ad Delivery % as decimal (0.0-1.0)
     estimated_impressions BIGINT,
     estimated_reach BIGINT,
     estimated_cpm NUMERIC,

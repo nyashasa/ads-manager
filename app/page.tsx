@@ -12,6 +12,51 @@ export default function DashboardPage() {
       const [isAdmin, setIsAdmin] = useState(false);
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [loading, setLoading] = useState(true);
+      const [stats, setStats] = useState({
+            totalRoutes: 0,
+            activeCampaigns: 0,
+            estimatedDailyReach: 0,
+      });
+
+      useEffect(() => {
+            async function fetchStats() {
+                  try {
+                        // Fetch total routes count
+                        const { count: routesCount } = await supabase
+                              .from('routes')
+                              .select('*', { count: 'exact', head: true })
+                              .eq('is_active', true);
+
+                        // Fetch active campaigns count
+                        const { count: campaignsCount } = await supabase
+                              .from('campaigns')
+                              .select('*', { count: 'exact', head: true })
+                              .eq('status', 'active');
+
+                        // Fetch estimated daily reach (sum of estimated_daily_ridership from routes)
+                        const { data: routes } = await supabase
+                              .from('routes')
+                              .select('estimated_daily_ridership')
+                              .eq('is_active', true);
+
+                        const totalReach = routes?.reduce((sum, route) => {
+                              return sum + (route.estimated_daily_ridership || 0);
+                        }, 0) || 0;
+
+                        setStats({
+                              totalRoutes: routesCount || 0,
+                              activeCampaigns: campaignsCount || 0,
+                              estimatedDailyReach: totalReach,
+                        });
+                  } catch (error) {
+                        console.error('Error fetching stats:', error);
+                  }
+            }
+
+            if (isAuthenticated) {
+                  fetchStats();
+            }
+      }, [isAuthenticated]);
 
       useEffect(() => {
             async function checkAuth() {
@@ -122,8 +167,8 @@ export default function DashboardPage() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Routes</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">2</div>
-                <p className="text-xs text-muted-foreground">+0% from last month</p>
+                <div className="text-2xl font-bold">{stats.totalRoutes}</div>
+                <p className="text-xs text-muted-foreground">Active routes</p>
               </CardContent>
             </Card>
             <Card>
@@ -131,8 +176,10 @@ export default function DashboardPage() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Active Campaigns</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">No active campaigns</p>
+                <div className="text-2xl font-bold">{stats.activeCampaigns}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.activeCampaigns === 0 ? 'No active campaigns' : `${stats.activeCampaigns} running`}
+                </p>
               </CardContent>
             </Card>
             <Card>
@@ -140,7 +187,11 @@ export default function DashboardPage() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Est. Daily Reach</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">130k+</div>
+                <div className="text-2xl font-bold">
+                  {stats.estimatedDailyReach >= 1000 
+                    ? `${(stats.estimatedDailyReach / 1000).toFixed(0)}k+`
+                    : stats.estimatedDailyReach.toLocaleString()}
+                </div>
                 <p className="text-xs text-muted-foreground">Across all corridors</p>
               </CardContent>
             </Card>

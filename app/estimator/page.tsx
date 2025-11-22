@@ -10,7 +10,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
-import { RefreshCw, Info } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { RefreshCw, Info, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 export default function EstimatorPage() {
       const [routes, setRoutes] = useState<any[]>([]);
@@ -23,6 +25,15 @@ export default function EstimatorPage() {
       const [estimate, setEstimate] = useState<any>(null);
       const [loadingEstimate, setLoadingEstimate] = useState(false);
       const [showAssumptions, setShowAssumptions] = useState(false);
+      const [maxAvailableSOV, setMaxAvailableSOV] = useState<number | null>(null);
+      const [availabilityLoading, setAvailabilityLoading] = useState(false);
+      const [unavailableDates, setUnavailableDates] = useState<string[]>([]);
+      const [routeAvailability, setRouteAvailability] = useState<Record<string, {
+            hasLimitedAvailability: boolean;
+            maxBookedSOV: number;
+            datesWithBooking: string[];
+            minAvailableSOV: number;
+      }>>({});
 
       useEffect(() => {
             async function fetchRoutes() {
@@ -35,6 +46,31 @@ export default function EstimatorPage() {
             }
             fetchRoutes();
       }, []);
+
+      // Fetch route availability when routes are selected (without dates - just to show "Limited" badge)
+      useEffect(() => {
+            const fetchRouteAvailability = async () => {
+                  if (selectedRouteIds.length === 0) {
+                        setRouteAvailability({});
+                        return;
+                  }
+
+                  try {
+                        const routeIdsParam = selectedRouteIds.join(',');
+                        const res = await fetch(`/api/routes/availability?routeIds=${routeIdsParam}`);
+                        
+                        if (res.ok) {
+                              const availabilityData = await res.json();
+                              setRouteAvailability(availabilityData.routes || {});
+                        }
+                  } catch (err) {
+                        console.error('Error fetching route availability:', err);
+                  }
+            };
+
+            const timer = setTimeout(fetchRouteAvailability, 300);
+            return () => clearTimeout(timer);
+      }, [selectedRouteIds]);
 
       const handleCalculate = async () => {
             if (selectedRouteIds.length === 0 || !startDate || !endDate) return;
@@ -86,6 +122,72 @@ export default function EstimatorPage() {
             fetchModel();
       }, []);
 
+      // Fetch availability when routes/dates change
+      useEffect(() => {
+            const fetchAvailability = async () => {
+                  if (selectedRouteIds.length === 0 || !startDate || !endDate) {
+                        setMaxAvailableSOV(null);
+                        setUnavailableDates([]);
+                        return;
+                  }
+
+                  setAvailabilityLoading(true);
+                  try {
+                        const res = await fetch('/api/campaigns/availability', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                    routeIds: selectedRouteIds,
+                                    startDate: startDate ? (() => {
+                                          const year = startDate.getFullYear();
+                                          const month = String(startDate.getMonth() + 1).padStart(2, '0');
+                                          const day = String(startDate.getDate()).padStart(2, '0');
+                                          return `${year}-${month}-${day}`;
+                                    })() : '',
+                                    endDate: endDate ? (() => {
+                                          const year = endDate.getFullYear();
+                                          const month = String(endDate.getMonth() + 1).padStart(2, '0');
+                                          const day = String(endDate.getDate()).padStart(2, '0');
+                                          return `${year}-${month}-${day}`;
+                                    })() : '',
+                                    dayparts: ['morning_peak', 'daytime', 'evening_peak'], // Default dayparts
+                              }),
+                        });
+
+                        if (res.ok) {
+                              const data = await res.json();
+                              const maxSOV = Math.round(data.maxAvailableSOV * 100); // Convert to percentage
+                              setMaxAvailableSOV(maxSOV);
+                              const unavailableDatesList = data.unavailableDates || [];
+                              console.log('Estimator: Setting unavailableDates:', unavailableDatesList);
+                              setUnavailableDates(unavailableDatesList);
+                              
+                              // Auto-adjustment for low availability (<10%)
+                              if (maxSOV < 10 && sov > maxSOV) {
+                                    // Automatically set to max available
+                                    setSov(maxSOV);
+                              } else if (sov > maxSOV) {
+                                    // For higher availability, just cap it
+                                    setSov(maxSOV);
+                              }
+                        } else {
+                              // If availability check fails, default to 100% (fallback)
+                              setMaxAvailableSOV(100);
+                              setUnavailableDates([]);
+                        }
+                  } catch (err) {
+                        console.error('Error fetching availability:', err);
+                        setMaxAvailableSOV(100); // Fallback to 100%
+                        setUnavailableDates([]);
+                  } finally {
+                        setAvailabilityLoading(false);
+                  }
+            };
+
+            const timer = setTimeout(fetchAvailability, 500);
+            return () => clearTimeout(timer);
+      }, [selectedRouteIds, startDate, endDate, sov]);
+
       // Wrap calculate in a useEffect to auto-calc when inputs change (debounced)
       useEffect(() => {
             const timer = setTimeout(() => {
@@ -99,8 +201,18 @@ export default function EstimatorPage() {
                                     advertiserId: 'estimator-tool',
                                     flight: {
                                           routeIds: selectedRouteIds,
-                                          startDate: startDate?.toISOString().split('T')[0],
-                                          endDate: endDate?.toISOString().split('T')[0],
+                                          startDate: startDate ? (() => {
+                                                const year = startDate.getFullYear();
+                                                const month = String(startDate.getMonth() + 1).padStart(2, '0');
+                                                const day = String(startDate.getDate()).padStart(2, '0');
+                                                return `${year}-${month}-${day}`;
+                                          })() : '',
+                                          endDate: endDate ? (() => {
+                                                const year = endDate.getFullYear();
+                                                const month = String(endDate.getMonth() + 1).padStart(2, '0');
+                                                const day = String(endDate.getDate()).padStart(2, '0');
+                                                return `${year}-${month}-${day}`;
+                                          })() : '',
                                           daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
                                           dayparts: ['morning_peak', 'daytime', 'evening_peak'],
                                           shareOfVoice: sov / 100,
@@ -143,23 +255,42 @@ export default function EstimatorPage() {
                                                 {loadingRoutes ? (
                                                       <p>Loading routes...</p>
                                                 ) : (
-                                                      routes.map(route => (
-                                                            <div key={route.id} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded">
-                                                                  <Checkbox
-                                                                        id={`est-${route.id}`}
-                                                                        checked={selectedRouteIds.includes(route.id)}
-                                                                        onCheckedChange={() => toggleRoute(route.id)}
-                                                                  />
-                                                                  <div className="grid gap-1">
-                                                                        <Label htmlFor={`est-${route.id}`} className="font-medium cursor-pointer">
-                                                                              {route.name}
-                                                                        </Label>
-                                                                        <span className="text-xs text-muted-foreground">
-                                                                              {route.corridors?.name} • {route.estimated_daily_ridership?.toLocaleString()} riders
-                                                                        </span>
+                                                      routes.map(route => {
+                                                            const availability = routeAvailability[route.id];
+                                                            const hasLimitedAvailability = availability?.hasLimitedAvailability || false;
+                                                            // Use nullish coalescing (??) instead of || to handle 0 correctly
+                                                            const minAvailableSOV = availability?.minAvailableSOV ?? undefined;
+                                                            
+                                                            return (
+                                                                  <div key={route.id} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded">
+                                                                        <Checkbox
+                                                                              id={`est-${route.id}`}
+                                                                              checked={selectedRouteIds.includes(route.id)}
+                                                                              onCheckedChange={() => toggleRoute(route.id)}
+                                                                        />
+                                                                        <div className="grid gap-1 flex-1">
+                                                                              <div className="flex items-center gap-2">
+                                                                                    <Label htmlFor={`est-${route.id}`} className="font-medium cursor-pointer">
+                                                                                          {route.name}
+                                                                                    </Label>
+                                                                                    {hasLimitedAvailability && (
+                                                                                          <Badge variant="outline" className="text-xs bg-amber-50 border-amber-200 text-amber-700">
+                                                                                                Limited
+                                                                                          </Badge>
+                                                                                    )}
+                                                                              </div>
+                                                                              <span className="text-xs text-muted-foreground">
+                                                                                    {route.corridors?.name} • {route.estimated_daily_ridership?.toLocaleString()} riders
+                                                                                    {hasLimitedAvailability && startDate && endDate && minAvailableSOV !== undefined && (
+                                                                                          <span className="ml-2 text-amber-600">
+                                                                                                • {Math.round(minAvailableSOV * 100)}% available
+                                                                                          </span>
+                                                                                    )}
+                                                                              </span>
+                                                                        </div>
                                                                   </div>
-                                                            </div>
-                                                      ))
+                                                            );
+                                                      })
                                                 )}
                                           </div>
                                           <div className="mt-2 text-sm text-muted-foreground text-right">
@@ -183,21 +314,59 @@ export default function EstimatorPage() {
                                                 <DatePicker date={endDate} onDateChange={setEndDate} placeholder="Select end date" />
                                           </div>
                                           <div className="col-span-1 sm:col-span-2 space-y-2">
-                                                <div className="flex justify-between">
-                                                      <Label>Share of Voice (Ad Intensity)</Label>
-                                                      <span className="text-sm text-muted-foreground">{sov}%</span>
+                                                <div className="flex justify-between items-center">
+                                                      <Label>Ad Delivery (Sessions to Reach)</Label>
+                                                      <div className="flex items-center gap-2">
+                                                            {maxAvailableSOV !== null && maxAvailableSOV < 100 && (
+                                                                  <span className="text-xs text-muted-foreground">
+                                                                        Max available: {maxAvailableSOV}%
+                                                                  </span>
+                                                            )}
+                                                            <span className="text-sm font-medium text-foreground">
+                                                                  {sov >= 10 && sov <= 20 ? 'Light' : 
+                                                                   sov >= 30 && sov <= 50 ? 'Standard' : 
+                                                                   sov >= 60 && sov <= 80 ? 'High' : 
+                                                                   sov >= 90 ? 'Max' : 'Light'}
+                                                            </span>
+                                                      </div>
                                                 </div>
                                                 <Slider
                                                       min={10}
-                                                      max={100}
+                                                      max={maxAvailableSOV !== null ? maxAvailableSOV : 100}
                                                       step={10}
                                                       value={[sov]}
                                                       onValueChange={(value) => setSov(value[0])}
                                                       className="w-full"
+                                                      disabled={availabilityLoading}
                                                 />
+                                                {unavailableDates && unavailableDates.length > 0 && (
+                                                      <Alert className="border-amber-200 bg-amber-50 mt-2">
+                                                            <AlertDescription className="text-xs text-amber-700">
+                                                                  <strong>Limited availability:</strong> The following dates have 0% delivery available and will be excluded from your estimate: {unavailableDates.map(date => {
+                                                                        // Parse date string (YYYY-MM-DD) in local timezone
+                                                                        const [year, month, day] = date.split('-').map(Number);
+                                                                        const d = new Date(year, month - 1, day);
+                                                                        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                                                  }).join(', ')}. Your estimate will only include the available dates.
+                                                            </AlertDescription>
+                                                      </Alert>
+                                                )}
+                                                {maxAvailableSOV !== null && maxAvailableSOV < 100 && unavailableDates.length === 0 && (
+                                                      <div className={`text-xs border rounded p-2 ${
+                                                            maxAvailableSOV < 10 
+                                                                  ? 'text-red-600 bg-red-50 border-red-200' 
+                                                                  : 'text-amber-600 bg-amber-50 border-amber-200'
+                                                      }`}>
+                                                            {maxAvailableSOV < 10 
+                                                                  ? `Only ${maxAvailableSOV}% delivery left on some routes for these dates. Slider has been adjusted to maximum available.`
+                                                                  : `Only ${maxAvailableSOV}% delivery is available for the selected routes and dates. Some inventory has already been booked.`
+                                                            }
+                                                      </div>
+                                                )}
                                                 <p className="text-xs text-muted-foreground">
-                                                      "Share of Voice" controls how often your ad appears relative to others.
-                                                      Higher % = more impressions and reach.
+                                                      "Ad Delivery" controls how many rider Wi-Fi sessions your ad appears in.
+                                                      Higher delivery = your ad appears in a larger share of rider sessions, increasing both reach and avg times seen per rider.
+                                                      
                                                 </p>
                                           </div>
                                     </CardContent>
@@ -249,8 +418,26 @@ export default function EstimatorPage() {
                                                       </div>
 
                                                       <div className="space-y-1">
-                                                            <p className="text-sm text-muted-foreground">Avg Frequency</p>
-                                                            <p className="text-lg font-medium">{estimate.estimatedReach ? (estimate.totalImpressions / estimate.estimatedReach).toFixed(1) : 0}× per rider</p>
+                                                            <div className="flex items-center gap-1">
+                                                                  <p className="text-sm text-muted-foreground">Avg Frequency</p>
+                                                                  <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent className="max-w-xs">
+                                                                              <p className="font-medium mb-1">Avg Frequency</p>
+                                                                              <p className="text-xs mb-2">How many times the average reached rider is expected to see your ad during the campaign, based on:</p>
+                                                                              <ul className="text-xs space-y-0.5 list-disc list-inside">
+                                                                                    <li>How often riders use these routes</li>
+                                                                                    <li>How many of those Wi-Fi sessions your campaign wins (Ad Delivery %)</li>
+                                                                              </ul>
+                                                                        </TooltipContent>
+                                                                  </Tooltip>
+                                                            </div>
+                                                            <p className="text-lg font-medium">
+                                                                  {estimate.avgFrequency ? estimate.avgFrequency.toFixed(1) : (estimate.estimatedReach ? (estimate.totalImpressions / estimate.estimatedReach).toFixed(1) : 0)}× per rider
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">Based on how many trips/sessions riders make during your campaign period.</p>
                                                       </div>
 
                                                       <div className="space-y-1">
@@ -276,17 +463,18 @@ export default function EstimatorPage() {
                                                             <div className="text-xs space-y-2 p-3 bg-muted/50 rounded-md">
                                                                   <p className="font-medium">Assumptions for this estimate</p>
                                                                   <div className="space-y-1">
+                                                                        <p>• Each Wi-Fi session shows 1 full ad experience (hero + banner).</p>
+                                                                        <p>• At {sov}% delivery, we aim to show your ad in ~{sov}% of eligible sessions on these routes.</p>
                                                                         <p>• Wi-Fi adoption: 60% of riders</p>
-                                                                        <p>• Avg ad exposures per rider per day: 4</p>
                                                                         <p>• Campaign days: {startDate && endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) : 0}</p>
-                                                                        <p>• Share of Voice: {sov}%</p>
+                                                                        <p>• Ad Delivery Level: {sov}%</p>
                                                                   </div>
                                                             </div>
                                                       )}
 
-                                                      <div className="flex flex-col sm:flex-row gap-2 mt-4">
+                                                      <div className="flex flex-col gap-2 mt-4">
                                                             <Button
-                                                                  className="flex-1"
+                                                                  className="w-full"
                                                                   onClick={() => {
                                                                         // Navigate to campaign wizard with pre-filled data
                                                                         const params = new URLSearchParams({
@@ -300,7 +488,7 @@ export default function EstimatorPage() {
                                                             >
                                                                   Book Campaign
                                                             </Button>
-                                                            <Button className="flex-1" variant="outline">
+                                                            <Button className="w-full" variant="outline">
                                                                   Export Quote (PDF)
                                                             </Button>
                                                       </div>

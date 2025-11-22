@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 
 interface RouteMapProps {
@@ -14,6 +14,18 @@ export default function RouteMap({ routes, selectedRouteIds, onRouteToggle }: Ro
       const map = useRef<mapboxgl.Map | null>(null);
       const [mapLoaded, setMapLoaded] = useState(false);
       const [error, setError] = useState<string | null>(null);
+      const routesFetchedRef = useRef<string>('');
+      const routeFeaturesRef = useRef<any[]>([]);
+      
+      // Memoize routes to prevent unnecessary re-fetches
+      const routesKey = useMemo(() => {
+            return routes.map(r => r.id).sort().join(',');
+      }, [routes]);
+      
+      // Memoize selected route IDs to prevent unnecessary updates
+      const selectedRouteIdsKey = useMemo(() => {
+            return [...selectedRouteIds].sort().join(',');
+      }, [selectedRouteIds]);
 
       useEffect(() => {
             if (!mapContainer.current || map.current) return;
@@ -70,6 +82,13 @@ export default function RouteMap({ routes, selectedRouteIds, onRouteToggle }: Ro
 
       useEffect(() => {
             if (!map.current || !mapLoaded) return;
+            
+            // Skip if we've already fetched for these routes
+            if (routesFetchedRef.current === routesKey) {
+                  return;
+            }
+            
+            routesFetchedRef.current = routesKey;
 
             // Remove existing sources and layers
             const existingSources = ['routes', 'selected-routes', 'routes-lines', 'selected-routes-lines'];
@@ -240,7 +259,7 @@ export default function RouteMap({ routes, selectedRouteIds, onRouteToggle }: Ro
 
                   if (validRouteFeatures.length === 0) {
                         console.warn('No valid route features to display');
-                        return;
+                        return null;
                   }
 
                   const selectedFeatures = validRouteFeatures.filter(f => 
@@ -383,8 +402,134 @@ export default function RouteMap({ routes, selectedRouteIds, onRouteToggle }: Ro
                   }
             };
 
-            fetchRoutePaths();
-      }, [routes, selectedRouteIds, mapLoaded, onRouteToggle]);
+            (async () => {
+                  const features = await fetchRoutePaths();
+                  if (features) {
+                        routeFeaturesRef.current = features;
+                        // Update layers with current selection
+                        updateRouteLayers(features);
+                  }
+            })();
+      }, [routesKey, mapLoaded]);
+      
+      // Separate effect to update layers when selection changes (without re-fetching)
+      useEffect(() => {
+            if (!map.current || !mapLoaded || routeFeaturesRef.current.length === 0) return;
+            
+            updateRouteLayers(routeFeaturesRef.current);
+      }, [selectedRouteIdsKey, mapLoaded]);
+      
+      // Helper function to update route layers
+      const updateRouteLayers = (validRouteFeatures: any[]) => {
+            if (!map.current) return;
+            
+            // Remove existing layers
+            const existingLayers = [
+                  'routes-lines-layer',
+                  'selected-routes-lines-layer',
+            ];
+            const existingSources = ['routes-lines', 'selected-routes-lines'];
+            
+            existingLayers.forEach(layer => {
+                  if (map.current?.getLayer(layer)) {
+                        map.current.removeLayer(layer);
+                  }
+            });
+            existingSources.forEach(source => {
+                  if (map.current?.getSource(source)) {
+                        map.current.removeSource(source);
+                  }
+            });
+            
+            const selectedFeatures = validRouteFeatures.filter(f => 
+                  selectedRouteIds.includes(f.properties.id)
+            );
+            const unselectedFeatures = validRouteFeatures.filter(f => 
+                  !selectedRouteIds.includes(f.properties.id)
+            );
+            
+            // Add unselected routes
+            if (unselectedFeatures.length > 0) {
+                  try {
+                        map.current.addSource('routes-lines', {
+                              type: 'geojson',
+                              data: {
+                                    type: 'FeatureCollection',
+                                    features: unselectedFeatures,
+                              },
+                        });
+                        map.current.addLayer({
+                              id: 'routes-lines-layer',
+                              type: 'line',
+                              source: 'routes-lines',
+                              paint: {
+                                    'line-color': '#3b82f6',
+                                    'line-width': 2,
+                                    'line-opacity': 0.8,
+                              },
+                        });
+                        // Re-add click handlers
+                        const currentMap = map.current;
+                        if (currentMap) {
+                              currentMap.on('click', 'routes-lines-layer', (e) => {
+                                    const feature = e.features?.[0];
+                                    if (feature && feature.properties) {
+                                          onRouteToggle(feature.properties.id);
+                                    }
+                              });
+                              currentMap.on('mouseenter', 'routes-lines-layer', () => {
+                                    currentMap.getCanvas().style.cursor = 'pointer';
+                              });
+                              currentMap.on('mouseleave', 'routes-lines-layer', () => {
+                                    currentMap.getCanvas().style.cursor = '';
+                              });
+                        }
+                  } catch (err) {
+                        console.error('Error adding unselected routes layer:', err);
+                  }
+            }
+            
+            // Add selected routes
+            if (selectedFeatures.length > 0) {
+                  try {
+                        map.current.addSource('selected-routes-lines', {
+                              type: 'geojson',
+                              data: {
+                                    type: 'FeatureCollection',
+                                    features: selectedFeatures,
+                              },
+                        });
+                        map.current.addLayer({
+                              id: 'selected-routes-lines-layer',
+                              type: 'line',
+                              source: 'selected-routes-lines',
+                              paint: {
+                                    'line-color': '#10b981',
+                                    'line-width': 3,
+                                    'line-opacity': 1,
+                              },
+                        });
+                        // Re-add click handlers
+                        const currentMapSelected = map.current;
+                        if (currentMapSelected) {
+                              currentMapSelected.on('click', 'selected-routes-lines-layer', (e) => {
+                                    const feature = e.features?.[0];
+                                    if (feature && feature.properties) {
+                                          onRouteToggle(feature.properties.id);
+                                    }
+                              });
+                              currentMapSelected.on('mouseenter', 'selected-routes-lines-layer', () => {
+                                    currentMapSelected.getCanvas().style.cursor = 'pointer';
+                              });
+                              currentMapSelected.on('mouseleave', 'selected-routes-lines-layer', () => {
+                                    currentMapSelected.getCanvas().style.cursor = '';
+                              });
+                        }
+                  } catch (err) {
+                        console.error('Error adding selected routes layer:', err);
+                  }
+            }
+      };
 
       if (error) {
             return (

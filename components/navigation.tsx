@@ -56,7 +56,21 @@ export default function Navigation() {
                         setUserEmail(null);
                   }
             }
+            
+            // Check auth on mount
             checkAuth();
+            
+            // Listen for auth state changes (login, logout, token refresh)
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+                  if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+                        await checkAuth();
+                  }
+            });
+            
+            // Cleanup subscription on unmount
+            return () => {
+                  subscription.unsubscribe();
+            };
       }, []);
 
       const handleLogout = async () => {
@@ -73,17 +87,20 @@ export default function Navigation() {
             <header className="border-b bg-background px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-50">
                   <Link href="/" className="flex items-center gap-2 min-w-0">
                         <div className="bg-primary text-primary-foreground p-1.5 rounded font-bold text-base sm:text-lg flex-shrink-0">UN</div>
-                        <span className="font-semibold text-base sm:text-lg truncate">UbuntuNet Ads Manager</span>
+                        <span className="font-semibold text-base sm:text-lg truncate">
+                              {isAuthenticated && isAdmin ? 'UbuntuNet Admin' : 'UbuntuNet Ads Manager'}
+                        </span>
                   </Link>
                   <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                         {isAuthenticated ? (
                               isAdmin ? (
                                     <>
-                                          <span className="hidden sm:inline text-sm text-muted-foreground">Admin</span>
-                                          <Link href="/admin/pricing">
-                                                <Button variant="outline" size="sm" className="text-xs sm:text-sm">Admin Panel</Button>
-                                          </Link>
-                                          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs sm:text-sm">Logout</Button>
+                                          <nav className="flex gap-3 sm:gap-4 text-xs sm:text-sm font-medium">
+                                                <Link href="/admin/campaigns" className="hover:underline whitespace-nowrap">Campaigns</Link>
+                                                <Link href="/admin/routes" className="hover:underline whitespace-nowrap">Routes</Link>
+                                                <Link href="/admin/pricing" className="hover:underline whitespace-nowrap">Pricing</Link>
+                                          </nav>
+                                          <Button variant="outline" size="sm" onClick={handleLogout} className="text-xs sm:text-sm">Logout</Button>
                                     </>
                               ) : (
                                     <>

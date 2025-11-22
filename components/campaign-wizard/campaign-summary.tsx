@@ -49,7 +49,7 @@ export default function CampaignSummary({ data }: any) {
                                     <p className="font-medium">{data.routeIds?.length || 0} routes</p>
                               </div>
                               <div>
-                                    <p className="text-sm text-muted-foreground">Share of Voice</p>
+                                    <p className="text-sm text-muted-foreground">Ad Delivery</p>
                                     <p className="font-medium">{data.shareOfVoice || 50}%</p>
                               </div>
                               <div>

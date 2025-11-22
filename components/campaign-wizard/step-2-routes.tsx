@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import RouteMap from './route-map';
 
@@ -11,6 +12,13 @@ export default function Step2Routes({ data, updateData }: any) {
       const [routes, setRoutes] = useState<any[]>([]);
       const [loading, setLoading] = useState(true);
       const [searchTerm, setSearchTerm] = useState('');
+      const [routeAvailability, setRouteAvailability] = useState<Record<string, {
+            hasLimitedAvailability: boolean;
+            maxBookedSOV: number;
+            datesWithBooking: string[];
+            minAvailableSOV: number;
+      }>>({});
+      const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
       useEffect(() => {
             async function fetchRoutes() {
@@ -46,6 +54,42 @@ export default function Step2Routes({ data, updateData }: any) {
             }
             fetchRoutes();
       }, []);
+
+      // Fetch route availability when selected routes change
+      useEffect(() => {
+            const fetchRouteAvailability = async () => {
+                  const selectedRouteIds = data.routeIds || [];
+                  
+                  if (selectedRouteIds.length === 0) {
+                        setRouteAvailability({});
+                        return;
+                  }
+
+                  setAvailabilityLoading(true);
+                  try {
+                        const routeIdsParam = selectedRouteIds.join(',');
+                        const res = await fetch(`/api/routes/availability?routeIds=${routeIdsParam}`);
+                        
+                        if (res.ok) {
+                              const availabilityData = await res.json();
+                              setRouteAvailability(availabilityData.routes || {});
+                              
+                              // Store detailed availability in wizard data for Step 3
+                              updateData({ 
+                                    routeAvailabilityData: availabilityData.detailedAvailability || {},
+                                    routeAvailabilitySummaries: availabilityData.routes || {}
+                              });
+                        }
+                  } catch (err) {
+                        console.error('Error fetching route availability:', err);
+                  } finally {
+                        setAvailabilityLoading(false);
+                  }
+            };
+
+            const timer = setTimeout(fetchRouteAvailability, 300);
+            return () => clearTimeout(timer);
+      }, [data.routeIds, updateData]);
 
       const toggleRoute = useCallback((routeId: string) => {
             const currentRoutes = data.routeIds || [];
@@ -91,23 +135,42 @@ export default function Step2Routes({ data, updateData }: any) {
                                     {loading ? (
                                           <p>Loading routes...</p>
                                     ) : (
-                                          filteredRoutes.map((route) => (
-                                                <div key={route.id} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded">
-                                                      <Checkbox
-                                                            id={route.id}
-                                                            checked={(data.routeIds || []).includes(route.id)}
-                                                            onCheckedChange={() => toggleRoute(route.id)}
-                                                      />
-                                                      <div className="grid gap-1.5 leading-none">
-                                                            <Label htmlFor={route.id} className="font-medium cursor-pointer">
-                                                                  {route.name} <span className="text-xs text-muted-foreground">({route.gabs_route_code})</span>
-                                                            </Label>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                  {route.corridors?.name} • {route.estimated_daily_ridership?.toLocaleString()} daily riders
-                                                            </p>
+                                          filteredRoutes.map((route) => {
+                                                const availability = routeAvailability[route.id];
+                                                const hasLimitedAvailability = availability?.hasLimitedAvailability || false;
+                                                // Use nullish coalescing (??) instead of || to handle 0 correctly
+                                                const minAvailableSOV = availability?.minAvailableSOV ?? undefined;
+                                                
+                                                return (
+                                                      <div key={route.id} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded">
+                                                            <Checkbox
+                                                                  id={route.id}
+                                                                  checked={(data.routeIds || []).includes(route.id)}
+                                                                  onCheckedChange={() => toggleRoute(route.id)}
+                                                            />
+                                                            <div className="grid gap-1.5 leading-none flex-1">
+                                                                  <div className="flex items-center gap-2">
+                                                                        <Label htmlFor={route.id} className="font-medium cursor-pointer">
+                                                                              {route.name} <span className="text-xs text-muted-foreground">({route.gabs_route_code})</span>
+                                                                        </Label>
+                                                                        {hasLimitedAvailability && (
+                                                                              <Badge variant="outline" className="text-xs bg-amber-50 border-amber-200 text-amber-700">
+                                                                                    Limited
+                                                                              </Badge>
+                                                                        )}
+                                                                  </div>
+                                                                  <p className="text-xs text-muted-foreground">
+                                                                        {route.corridors?.name} • {route.estimated_daily_ridership?.toLocaleString()} daily riders
+                                                                        {hasLimitedAvailability && data.startDate && data.endDate && minAvailableSOV !== undefined && (
+                                                                              <span className="ml-2 text-amber-600">
+                                                                                    • {Math.round(minAvailableSOV * 100)}% available
+                                                                              </span>
+                                                                        )}
+                                                                  </p>
+                                                            </div>
                                                       </div>
-                                                </div>
-                                          ))
+                                                );
+                                          })
                                     )}
                                     {!loading && filteredRoutes.length === 0 && (
                                           <p className="text-muted-foreground text-center py-4">No routes found.</p>
