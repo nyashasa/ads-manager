@@ -30,17 +30,17 @@ export default function RouteExplorerPage() {
       );
 
       return (
-            <div className="container mx-auto py-8">
-                  <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-3xl font-bold">Route Explorer</h1>
+            <div className="container mx-auto py-8 px-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                        <h1 className="text-2xl sm:text-3xl font-bold">Route Explorer</h1>
                         <Link href="/campaigns/new">
-                              <Button>Create Campaign</Button>
+                              <Button className="w-full sm:w-auto">Create Campaign</Button>
                         </Link>
                   </div>
 
-                  <div className="flex gap-6">
+                  <div className="flex flex-col lg:flex-row gap-6">
                         {/* Sidebar / Filters */}
-                        <div className="w-1/4 space-y-4">
+                        <div className="w-full lg:w-1/4 space-y-4">
                               <Card>
                                     <CardHeader className="bg-primary/5 border-b border-primary/10">
                                           <CardTitle className="text-lg">Filters</CardTitle>
@@ -63,7 +63,7 @@ export default function RouteExplorerPage() {
                         </div>
 
                         {/* Main Content */}
-                        <div className="w-3/4 grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+                        <div className="w-full lg:w-3/4 grid gap-4 sm:grid-cols-1 md:grid-cols-2">
                               {loading ? (
                                     <p>Loading routes...</p>
                               ) : (

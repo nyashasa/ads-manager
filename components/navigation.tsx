@@ -70,24 +70,24 @@ export default function Navigation() {
       }
 
       return (
-            <header className="border-b bg-background px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-                  <Link href="/" className="flex items-center gap-2">
-                        <div className="bg-primary text-primary-foreground p-1.5 rounded font-bold text-lg">UN</div>
-                        <span className="font-semibold text-lg">UbuntuNet Ads Manager</span>
+            <header className="border-b bg-background px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-50">
+                  <Link href="/" className="flex items-center gap-2 min-w-0">
+                        <div className="bg-primary text-primary-foreground p-1.5 rounded font-bold text-base sm:text-lg flex-shrink-0">UN</div>
+                        <span className="font-semibold text-base sm:text-lg truncate">UbuntuNet Ads Manager</span>
                   </Link>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                         {isAuthenticated ? (
                               isAdmin ? (
                                     <>
-                                          <span className="text-sm text-muted-foreground">Admin</span>
+                                          <span className="hidden sm:inline text-sm text-muted-foreground">Admin</span>
                                           <Link href="/admin/pricing">
-                                                <Button variant="outline" size="sm">Admin Panel</Button>
+                                                <Button variant="outline" size="sm" className="text-xs sm:text-sm">Admin Panel</Button>
                                           </Link>
-                                          <Button variant="ghost" size="sm" onClick={handleLogout}>Logout</Button>
+                                          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs sm:text-sm">Logout</Button>
                                     </>
                               ) : (
                                     <>
-                                          <span className="text-sm text-muted-foreground">Internal Ops View</span>
+                                          <span className="hidden sm:inline text-sm text-muted-foreground">Internal Ops View</span>
                                           <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
                                                 OP
                                           </div>
@@ -96,7 +96,7 @@ export default function Navigation() {
                         ) : (
                               // Not authenticated - show login button
                               <Link href="/admin/login">
-                                    <Button variant="outline" size="sm">Login</Button>
+                                    <Button variant="outline" size="sm" className="text-xs sm:text-sm">Login</Button>
                               </Link>
                         )}
                   </div>

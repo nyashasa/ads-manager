@@ -173,7 +173,7 @@ export default function EstimatorPage() {
                                     <CardHeader className="bg-primary/5 border-b border-primary/10">
                                           <CardTitle>2. Campaign Parameters</CardTitle>
                                     </CardHeader>
-                                    <CardContent className="grid grid-cols-2 gap-4">
+                                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                           <div className="space-y-2">
                                                 <Label>Start Date</Label>
                                                 <DatePicker date={startDate} onDateChange={setStartDate} placeholder="Select start date" />
@@ -182,7 +182,7 @@ export default function EstimatorPage() {
                                                 <Label>End Date</Label>
                                                 <DatePicker date={endDate} onDateChange={setEndDate} placeholder="Select end date" />
                                           </div>
-                                          <div className="col-span-2 space-y-2">
+                                          <div className="col-span-1 sm:col-span-2 space-y-2">
                                                 <div className="flex justify-between">
                                                       <Label>Share of Voice (Ad Intensity)</Label>
                                                       <span className="text-sm text-muted-foreground">{sov}%</span>
@@ -205,8 +205,8 @@ export default function EstimatorPage() {
                         </div>
 
                         {/* Right Column: Results */}
-                        <div>
-                              <Card className="sticky top-6 border-primary/20 shadow-lg">
+                        <div className="md:col-span-1">
+                              <Card className="md:sticky md:top-6 border-primary/20 shadow-lg">
                                     <CardHeader className="bg-primary/5 border-b border-primary/10">
                                           <CardTitle className="flex items-center gap-2">
                                                 Estimate
@@ -284,7 +284,7 @@ export default function EstimatorPage() {
                                                             </div>
                                                       )}
 
-                                                      <div className="flex gap-2 mt-4">
+                                                      <div className="flex flex-col sm:flex-row gap-2 mt-4">
                                                             <Button
                                                                   className="flex-1"
                                                                   onClick={() => {

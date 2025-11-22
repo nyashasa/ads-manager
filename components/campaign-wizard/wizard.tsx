@@ -67,12 +67,12 @@ export default function CampaignWizard() {
                         </div>
                   </div>
 
-                  <div className="grid md:grid-cols-3 gap-6">
+                  <div className="grid lg:grid-cols-3 gap-6">
                         {/* Left Column: Main Content */}
-                        <div className="md:col-span-2">
+                        <div className="lg:col-span-2">
                               <Card>
                                     <CardHeader className="bg-primary/5 border-b border-primary/10">
-                                          <CardTitle>
+                                          <CardTitle className="text-lg sm:text-xl">
                                                 {step === 1 && 'Step 1: Objective & Advertiser'}
                                                 {step === 2 && 'Step 2: Audience & Routes'}
                                                 {step === 3 && 'Step 3: Schedule & Budget'}
@@ -87,11 +87,11 @@ export default function CampaignWizard() {
                                           {step === 4 && <Step4Creatives data={formData} updateData={updateData} />}
                                           {step === 5 && <Step5Review data={formData} updateData={updateData} />}
                                     </CardContent>
-                                    <CardFooter className="flex justify-between">
-                                          <Button variant="outline" onClick={prevStep} disabled={step === 1}>
+                                    <CardFooter className="flex flex-col sm:flex-row justify-between gap-2">
+                                          <Button variant="outline" onClick={prevStep} disabled={step === 1} className="w-full sm:w-auto">
                                                 Back
                                           </Button>
-                                          <Button onClick={nextStep} disabled={step === 5}>
+                                          <Button onClick={nextStep} disabled={step === 5} className="w-full sm:w-auto">
                                                 {step === 5 ? 'Submit' : 'Next'}
                                           </Button>
                                     </CardFooter>
@@ -99,7 +99,7 @@ export default function CampaignWizard() {
                         </div>
 
                         {/* Right Column: Campaign Summary Sidebar */}
-                        <div>
+                        <div className="lg:col-span-1">
                               <CampaignSummary data={formData} />
                         </div>
                   </div>
