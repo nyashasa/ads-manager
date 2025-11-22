@@ -20,6 +20,12 @@ export default function CampaignWizard() {
             startDate: '',
             endDate: '',
             shareOfVoice: 50,
+            firstName: '',
+            lastName: '',
+            email: '',
+            phone: '',
+            company: '',
+            notes: '',
             // ... other fields
       });
 
@@ -39,10 +45,7 @@ export default function CampaignWizard() {
                         endDate: endDate || prev.endDate,
                         shareOfVoice: shareOfVoice ? parseInt(shareOfVoice) : prev.shareOfVoice,
                   }));
-                  // If coming from estimator, skip to step 3 (schedule already filled)
-                  if (routes && startDate && endDate) {
-                        setStep(2);
-                  }
+                  // Always start at step 1, even when data is prefilled from estimator
             }
       }, []);
 
@@ -82,7 +85,7 @@ export default function CampaignWizard() {
                                           {step === 2 && <Step2Routes data={formData} updateData={updateData} />}
                                           {step === 3 && <Step3Schedule data={formData} updateData={updateData} />}
                                           {step === 4 && <Step4Creatives data={formData} updateData={updateData} />}
-                                          {step === 5 && <Step5Review data={formData} />}
+                                          {step === 5 && <Step5Review data={formData} updateData={updateData} />}
                                     </CardContent>
                                     <CardFooter className="flex justify-between">
                                           <Button variant="outline" onClick={prevStep} disabled={step === 1}>
